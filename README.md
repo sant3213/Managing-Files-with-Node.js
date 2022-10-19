@@ -347,18 +347,28 @@ for (let index = 0; index < 50000; index++) {
 &nbsp;&nbsp;&nbsp;If we pass a string or a path such as a file.csv. In this situation readFile() will close the file for us because we're providing it a path to the file. 
 
 ```js
-readFile('file.csv', 'utf8', (err, data) => {
+    readFile('file.csv', 'utf8', (err, data) => {
 
-})
+    })
 ```
 
 &nbsp;&nbsp;&nbsp;However, if we tweak that code slightly by passing in a file descriptor like this:
 ```js
-readFile(fd, 'utf8', (err, data) => {
-    
-})
+    readFile(fd, 'utf8', (err, data) => {
+        
+    })
 ```
 
 readFile() will not close that file for us, because it will not close a file descriptor, and the code above is a perfectly valid use of readFile, it doesn't have to take a string, it can take a <strong>file descriptor</strong>.
 
 <font size="4">&nbsp;&nbsp;&nbsp;<strong>any time we have a file descriptor, we are responsible for closing that file.</strong></font> If we don't, we're exposing ourselves to the risk of opening too many files and crashing the application.
+
+<font size="5">&nbsp;<strong> writing to a File</strong></font>
+
+&nbsp;&nbsp;&nbsp;Since I'm using Node, one situation I might run into is needing to export my source code so that other developers can use it. These export libraries can be installed by others using npm, but before they can be installed by npm, they need to be created by me.
+
+&nbsp;&nbsp;&nbsp;AIn some cases, creating a library is as simple as exporting a single to a package sharing a single file, but often it's much more difficult than that.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- writing an Entire File</strong></font>
+
+All sync functions need to have a callback

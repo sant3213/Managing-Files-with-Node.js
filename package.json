@@ -1,0 +1,23 @@
+{
+  "name": "managing-files-with-node",
+  "version": "1.0.0",
+  "description": "**<font size=\"5\">Reading an Entire File</font>**",
+  "main": "asynchronous.read.chunk.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sant3213/Managing-Files-with-Node.js.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sant3213/Managing-Files-with-Node.js/issues"
+  },
+  "type": "module",
+  "homepage": "https://github.com/sant3213/Managing-Files-with-Node.js#readme",
+  "dependencies": {
+    "camelcase": "^7.0.0"
+  }
+}
