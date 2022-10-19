@@ -4,5 +4,5 @@ const { readFile } = require('fs');
 readFile('./data/pulitzer-circulation-data.csv', 'utf8', (err, data) => {
     const vals = convertCsv(data);
 
-    console.log(vals);
+    console.table(vals);
 })
