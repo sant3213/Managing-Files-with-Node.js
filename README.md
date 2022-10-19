@@ -243,7 +243,7 @@ fs.open('./data/app.log', (err, fd) => {
 
     let count = 0;
 
-    do{
+    do {
         const buffer = Buffer.alloc(200);
 
         count = fs.readSync(fd, buffer, 0, buffer.length, null);
@@ -255,3 +255,110 @@ fs.open('./data/app.log', (err, fd) => {
 &nbsp;&nbsp;&nbsp;- First, the buffer is created inside the do statement. We want to re-initialize this buffer with all zeroes every single time we read it, otherwise when we get to the end there might be some leftover data.
 
 &nbsp;&nbsp;&nbsp;- Second, the position parameter for readSync has changed from 0 to null. If the value is null, Node wil actually keep track of where it was in the file and pick up there the next time you try to read.
+
+
+**<font size="4">&nbsp;- Managing Files with Node.js</font>** (./file.descriptor.error.js)
+
+&nbsp;&nbsp;&nbsp;<strong>Files descriptors (fd)</strong> have the ability to crash the application, but the prevention is actually pretty simple.
+
+&nbsp;&nbsp;&nbsp;Let's start by looking at what the <strong>file descriptors </strong> can do.
+
+```js
+const fs = require('fs');
+
+console.log('Opening files...');
+for (let index = 0; index < 50000; index++) {
+    const fd = fs.openSync('./data/app.log');    
+    console.log(fd);
+}
+```
+
+```js
+    .
+    .
+    122877
+    122878
+    22879
+    node:internal/fs/utils:348
+        throw err;
+    Error: EMFILE: too many open files, open './data/app.log'
+```
+
+&nbsp;&nbsp;&nbsp;The terminal output the file descriptor each time a new file was opened before it eventually crashed. The number might be different depending on the OS and some other settings.
+
+&nbsp;&nbsp;&nbsp;Most operating systems have limits about the number of files that can be open at any given time. This is the error that we're seeing. We're asking the OS to open more files that it allows.
+
+&nbsp;&nbsp;&nbsp;Notice that the error isnt that the operating system limits the number of files that your process can open. The operating system is limiting the total number of open files, including files opened by other applications, so our code need so be a good community member and not contribute needlessly to that number.
+
+&nbsp;&nbsp;&nbsp;To prevent that error from happening: If I close this file, this error will not happen.
+
+```js
+    const fs = require('fs');
+
+    console.log('Opening files...');
+    for (let index = 0; index < 185000; index++) {
+        const fd = fs.openSync('./data/app.log');    
+        console.log(fd);
+        fs.closeSync(fd);
+    }
+```
+```js
+    23
+    23
+    23
+    23
+    23
+    23
+    23
+```
+&nbsp;&nbsp;&nbsp;It reused the same file descriptor (23 in my case). When we close the file it frees up that file descriptor from the table so it can be reused. In fact, if you were to use <strong>fs.close</strong>  instead of <strong>fs.closeSync,</strong> you would see that fd fluctuates between at least two numbers and possibly more.
+
+```js
+    const fs = require('fs');
+
+    console.log('Opening files...');
+    for (let index = 0; index < 185000; index++) {
+        const fd = fs.openSync('./data/app.log');    
+        console.log(fd);
+        fs.close(fd, () => {});
+    }
+```
+```js
+    26
+    28
+    23
+    24
+    26
+    23
+    24
+    23
+    26
+    28
+    29
+    30
+    31
+    32
+    33
+    34
+```
+
+&nbsp;&nbsp;&nbsp;Any time we use open or openSync, we need to call the corresponding close or closeSync.
+
+&nbsp;&nbsp;&nbsp;If we pass a string or a path such as a file.csv. In this situation readFile() will close the file for us because we're providing it a path to the file. 
+
+```js
+readFile('file.csv', 'utf8', (err, data) => {
+
+})
+```
+
+&nbsp;&nbsp;&nbsp;However, if we tweak that code slightly by passing in a file descriptor like this:
+```js
+readFile(fd, 'utf8', (err, data) => {
+    
+})
+```
+
+readFile() will not close that file for us, because it will not close a file descriptor, and the code above is a perfectly valid use of readFile, it doesn't have to take a string, it can take a <strong>file descriptor</strong>.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>any time we have a file descriptor, we are responsible for closing that file.</strong></font> If we don't, we're exposing ourselves to the risk of opening too many files and crashing the application.
