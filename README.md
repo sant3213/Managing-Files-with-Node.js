@@ -1,5 +1,7 @@
 # Managing-Files-with-Node.js
 
+**<font size="5">Reading an Entire File</font>**
+
 &nbsp;&nbsp;&nbsp;**<font size="4">Reading a File Asynchronously</font>**
 
 &nbsp;&nbsp;&nbsp;How to read a file using the asynchronous readFile function in the fs API of Node.js.
@@ -120,3 +122,136 @@ readFile('./data/pulitzer-circulation-data.csv', 'utf8')
     .catch(err => console.log(`File error: ${err}`))
 
 ```
+
+**<font size="5">Reading Parts of a File</font>**
+
+**<font size="4">&nbsp;- Opening a File to Read</font>**
+
+&nbsp;&nbsp;&nbsp;When reading an entire file, Node takes care of opening a file and loading in the entire contents. However, when you want to read just part of a file, you have to break it down into multiple steps for Node.
+
+&nbsp;&nbsp;&nbsp;The flexibility of only reading parts of a file comes with increased complexity in your code.
+
+&nbsp;&nbsp;&nbsp;Since it is an async function the second parameter is a callback.
+
+&nbsp;&nbsp;&nbsp;fd is the common abbreviation used for File descriptor. when a file is opened on an operating system, the operating system tracks the open file and places an identifier to that file in a table of open files. There is an identifier that can be used to access the file.
+
+&nbsp;&nbsp;&nbsp;Since Node can run on multiple operating systems, the fs library abstracts away any of the differences and returns a numeric descriptor for each open file. Node then uses this file descriptor to look up the file from the operating system's file table, and the file table returns the desired file.
+
+&nbsp;&nbsp;&nbsp;Most operating systems have limits about the number of files that can be opened at any given time. So to wrap up, a <strong>file descriptor</strong> can be thought of as a file identifier and it typically is stored in a variable named fd.
+
+
+&nbsp;&nbsp;&nbsp; We need to give the read function a buffer that the file can be read into. So we create a new Buffer that allocates 200 bytes long.
+
+&nbsp;&nbsp;&nbsp; This is not an offset for the file, but for the buffer. If I set an offset of 5, the first byte read from the file would be stored in the fifth byte in the buffer, and bytes 1 through 4 would be 0. We don't want an offset so we'll set that to 0.
+
+&nbsp;&nbsp;&nbsp; Now we need to tell read how many bytes we want to read from the file. we set buffer.length for the entire buffer.
+&nbsp;&nbsp;&nbsp; To tell the function where to start reading in the file we set 0 to start at the beginning.
+```js
+const { open, read } = require('fs');
+
+open('./data/pulitzer-circulation-data.csv', (err, fd) => {
+    const buffer = Buffer.alloc(200);
+    read(fd, buffer, 0, buffer.length, 0, (err, count, buff) => {
+    console.table(convertCsv(buff.toString()));
+    })
+});
+
+```
+
+&nbsp;&nbsp;&nbsp;We've told read what file to read from, where to store the data, where in our buffer to start storing that data, how much data to read in, and where in our file to start reading.
+
+&nbsp;&nbsp;&nbsp;Sinces it is read and not readSync, it's asynchronous. So we need to pass it a callback.
+
+&nbsp;&nbsp;&nbsp; <strong>count</strong> parameter is the number of bytes that were read.
+
+&nbsp;&nbsp;&nbsp; <strong>buff</strong> parameter is the data that was read.
+
+**<font size="4">&nbsp;- Reading a Chunk at a time</font>**
+
+&nbsp;&nbsp;&nbsp; To be able to read through a file a chunk at a time, we need to know how big the file is so we know how many total bytes we'll need to read.
+
+```js
+const fs = require('fs');
+
+let totalSize = 0;
+fs.stat('./data/app.log', (err, {size}) => totalSize = size);
+
+fs.open('./data/app.log', (err, fd) => {
+    const buffer = Buffer.alloc(200);
+
+    for(let i = 0; i <= totalSize / buffer.length; i++) {
+        fs.read(fd, buffer, 0, buffer.length, i*buffer.length, (err, count, buff) => {
+            console.log(buff.toString());
+        })
+    }
+})
+
+```
+
+&nbsp;&nbsp;&nbsp; There are two points in particular to notice here. 
+
+&nbsp;&nbsp;&nbsp; - First, the second term in the loop is the totalSize divided by buffer.length. That is, it's the totalSize divided by the individual chunks that we're going to use. This gets us the total number  of times that we need to loop through this routine.
+
+&nbsp;&nbsp;&nbsp; - Second, the position parameter in read is now set to 200 bytes times the number of the iteration, so the first one will be 0, and then we'll start it by 200, and then start it by 400, etc.
+
+&nbsp;&nbsp;&nbsp; There's two problems with the solution, though.
+
+&nbsp;&nbsp;&nbsp; - First, it's not great that we have to keep track of how big our buffer is everywhere. We're probably managing more state than we really want to be. We're not just reading a file, but we're keeping track of where we are in the file. However, that's probably not the biggest problem.
+
+&nbsp;&nbsp;&nbsp; -  Does the last line of the file app.log, line 1000 match the output of the terminal? It cuts off the last line before reading it, and that's because we're executing read in a for loop, and read is asynchronous and there's no guarantee of the order that the functions will return.
+
+```js
+    .
+    .
+    .
+    122.248.119.131 - hilpert6706 [21/09/2019:10:07:21 -0500] "POST /synergies/architect/benchmark/benchmark" 400 4673
+    163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /dot-c
+    om" 405 21512mesh" 304 26679
+    122.248.119.131 - hilpert6706 [21/09/2019:10:07:21 -0500] "POST /synergies/architect/benchmark/benchmark" 400 4673
+    163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /dot-c
+```
+
+**<font size="4">&nbsp;- Reading Parts Synchronously</font>**
+
+&nbsp;&nbsp;&nbsp; By reading parts of a file synchronously, we'll be able to guarantee the data all comes back in the right order.
+
+```js
+    const fs = require('fs');
+
+    const fd = fs.openSync('./data/app.log');
+
+    const buffer = Buffer.alloc(200);
+
+    fs.readSync(fd, buffer, 0, buffer.length, 0);
+
+    console.log(buffer.toString());
+
+```
+&nbsp;&nbsp;&nbsp; read's callback took two parameters besides the err parameter, it took a count and a buff parameter.
+&nbsp;&nbsp;&nbsp; readSync returns the first parameter or the number of bytes read.
+
+&nbsp;&nbsp;&nbsp; So how do we get access to the data that was read? The buffer that was created was updated through the process of readSync. So to get the data displayed on the screen, simply log out buffer.toString().
+
+&nbsp;&nbsp;&nbsp; This solves the first problem from the previous code. The fyle is now read synchronously. But how can we use this to chunk through an entire file?
+
+&nbsp;&nbsp;&nbsp; The first thing we need to do is create a variable to hold the number of bytes read.
+
+```js
+    const fs = require('fs');
+
+    const fd = fs.openSync('./data/app.log');
+
+    let count = 0;
+
+    do{
+        const buffer = Buffer.alloc(200);
+
+        count = fs.readSync(fd, buffer, 0, buffer.length, null);
+
+        console.log(buffer.toString());
+    } while (count > 0)
+
+```
+&nbsp;&nbsp;&nbsp;- First, the buffer is created inside the do statement. We want to re-initialize this buffer with all zeroes every single time we read it, otherwise when we get to the end there might be some leftover data.
+
+&nbsp;&nbsp;&nbsp;- Second, the position parameter for readSync has changed from 0 to null. If the value is null, Node wil actually keep track of where it was in the file and pick up there the next time you try to read.
