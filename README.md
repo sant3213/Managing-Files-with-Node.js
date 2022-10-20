@@ -359,16 +359,179 @@ for (let index = 0; index < 50000; index++) {
     })
 ```
 
-readFile() will not close that file for us, because it will not close a file descriptor, and the code above is a perfectly valid use of readFile, it doesn't have to take a string, it can take a <strong>file descriptor</strong>.
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">readFile() will not close that file for us, because it will not close a file descriptor, and the code above is a perfectly valid use of readFile, it doesn't have to take a string, it can take a <strong>file descriptor</strong>.</div>
 
-<font size="4">&nbsp;&nbsp;&nbsp;<strong>any time we have a file descriptor, we are responsible for closing that file.</strong></font> If we don't, we're exposing ourselves to the risk of opening too many files and crashing the application.
+<font size="4">&nbsp;&nbsp;&nbsp;<div style="text-align: left"><strong>any time we have a file descriptor, we are responsible for closing that file.</strong></font> If we don't, we're exposing ourselves to the risk of opening too many files and crashing the application.</div>
 
 <font size="5">&nbsp;<strong> writing to a File</strong></font>
 
-&nbsp;&nbsp;&nbsp;Since I'm using Node, one situation I might run into is needing to export my source code so that other developers can use it. These export libraries can be installed by others using npm, but before they can be installed by npm, they need to be created by me.
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">Since I'm using Node, one situation I might run into is needing to export my source code so that other developers can use it. These export libraries can be installed by others using npm, but before they can be installed by npm, they need to be created by me.</div>
 
-&nbsp;&nbsp;&nbsp;AIn some cases, creating a library is as simple as exporting a single to a package sharing a single file, but often it's much more difficult than that.
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">In some cases, creating a library is as simple as exporting a single file to a package sharing a single file, but often it's much more difficult than that.</div>
 
-<font size="4">&nbsp;&nbsp;&nbsp;<strong>- writing an Entire File</strong></font>
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Writing an Entire File</strong></font>
 
-All sync functions need to have a callback
+All sync functions need to have a callback.
+
+
+
+```js
+import { writeFile } from 'fs';
+
+
+writeFile('./data/app.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+```
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Appending to a File</strong></font>
+
+&nbsp;&nbsp;&nbsp;In order to append data to the file, instead of just overwriting the data.
+
+&nbsp;&nbsp;&nbsp;The parameters for writing asynchronously are:
+- The Path to the file we want to write.
+- The contents of the data that we want to write.
+- The callback.
+- Optional. The Options parameter comes between the data and the callback. This is a string and it tells the writeFile function how it needs to open the file. The <strong>default flag is w</strong>, which simply means overwrite the file, create it if it doesn't exist.
+
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">We need to pass in an object as the third parameter. And inside this object we need to specify the flag parameter and set it to the string <strong>'a'</strong> for append.</div>
+
+```js
+import { writeFile } from 'fs';
+
+
+writeFile('./data/app.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    {flag: 'a'},
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+```
+
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">Another way to append a file is changing the <strong>writeFile</strong> function by <strong>appendFile</strong> and removing the option object from the parameter.</div>
+
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">Much like the writeFile function defaults the flag to w, the append file defaults the falg to a.</div>
+
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">Even though appendFile exists, it's still important to know about the options object because there are other flags that do not have the corresponding functions defined.</div>
+
+&nbsp;&nbsp;&nbsp;<div style="text-align: left">Additionally, there are other options available for when you write a file. For instance, If you wanted to know how to write a Base64 file but throw an exception if the file already exists.</div>
+
+```js
+import { appendFile } from 'fs';
+
+
+appendFile('./data/app.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+```
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- utilizing Options</strong></font>
+
+In Node the X flag is the exclusive flag, and it can be added to other flags such as w, which will cause the system to throw an error if the file already exists.
+Setting the flag parameter to <strong>WX</strong>, 
+```js
+import { appendFile } from 'fs';
+
+appendFile('./data/app.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+
+    [Error: EEXIST: file already exists, open './data/app.log'] {
+  errno: -17,
+  code: 'EEXIST',
+  syscall: 'open',
+  path: './data/app.log'
+}
+```
+
+&nbsp;&nbsp;&nbsp;<strong>File Flag parameter Options</strong>
+- r : Read mode.
+- w : Write mode.
+- a : Append mode.
+
+&nbsp;&nbsp;&nbsp; <strong>Add-on Flags</strong>
+- X : Exclusive.
+- "+" : Multiple modes. Used to open a file in multiple modes. 
+  <strong>r+</strong> will open the file for both reading and writing. 
+  <strong>w+</strong> will also open the file for both reading and writing. The difference is that if the file does not exist, r+ will throw an exception and w+ will create the file.
+  <strong>a+</strong>, much like w+, will open a file for both reading and appending, and it'll create the file if it does not exist.
+
+- S : Synchronous. For example, rs+ will open a file for reading and writing synchronously. Note in this case the s has to do with file I/O and not the Javascript function. That is, including the flag s will not convert open to openSync.
+
+&nbsp;&nbsp;&nbsp; Allowed Combinations for Read
+
+- r: For read mode.
+- r+: For read and write mode.
+- rs+: For read and write mode synchronously.
+
+&nbsp;&nbsp;&nbsp; Allowed Combinations for Write
+
+- w: Will open the file in write mode.
+- wx: Will open the file in a write exclusive mode throwing an error if the file already exists.
+- w+: will open the file in both read and write mode.
+- wx+ will open a file in both read and write mode, and throw an error if the file already exists.
+
+&nbsp;&nbsp;&nbsp; Allowed Combinations for Append.
+- a: For append mode.
+- ax: For exclusive append mode.
+- a+: For append and read mode.
+- ax+: For an exclusive append and read mode.
+- as: For appending synchronously.
+- as+ For appending and reading synchronously.
+
+This will create a file newapp.log with the permissions that only the owner can read or write the file.
+
+```js
+import { constants, writeFile } from 'fs';
+   writeFile('./data/newapp.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    { mode: constants.S_IWUSR | constants.S_IRUSR},
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+
+```
+
+To see the permissions of each file in the data folder:
+```js
+    ls -l ./data
+```
+
+<img src="permissionsConstants.png"></img>
+
+It can be used specifying the codes as following:
+```js
+    .
+    .
+   { mode: 0o600},
+```
+
+To encode the string we send to the file with base64, we use the parameter <strong>encoding</strong>
+```js
+import { writeFile } from 'fs';
+   writeFile('./data/newapp.log',
+    '163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512',
+    { encoding: 'base64'},
+    (err) => {
+        err ? console.log(err) : console.log('file saved!');
+    });
+
+```
+
+In addition to <strong>utf8</strong> and <strong>base64</strong>, Nodes supports <strong>ASCII</strong> encoding, <strong>utf16le or ucs2</strong> which both refer to 2 or 4 byte little-endian encoded Unicode characters. It supports <strong>latin1 or binary</strong>, which are both 1 byte encoded strings as defined by the IANA in RFC 134. And it supports a <strong>hex</strong> encoding which encodes each byte as two hexadecimal characters.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Writing Parts of a File</strong></font>
+
+The requirements when we're going to need when we build our index file.
+
+- We'll open up a file index.js, and this will be the file that we're writing to.
+- We'll get a list of files that we want to add in as exports to this file.
+- We want to iterate over our list of files and create an export statement that exports a function with the same name as the file.
+- We want to write to that file.
+- We want to close the file.
