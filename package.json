@@ -15,6 +15,7 @@
   "bugs": {
     "url": "https://github.com/sant3213/Managing-Files-with-Node.js/issues"
   },
+  "type": "module",
   "homepage": "https://github.com/sant3213/Managing-Files-with-Node.js#readme",
   "dependencies": {
     "camelcase": "^7.0.0"

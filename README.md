@@ -431,8 +431,10 @@ appendFile('./data/app.log',
 
 <font size="4">&nbsp;&nbsp;&nbsp;<strong>- utilizing Options</strong></font>
 
-In Node the X flag is the exclusive flag, and it can be added to other flags such as w, which will cause the system to throw an error if the file already exists.
-Setting the flag parameter to <strong>WX</strong>, 
+<div style="text-align: left">&nbsp;&nbsp;&nbsp;In Node the X flag is the exclusive flag, and it can be added to other flags such as w, which will cause the system to throw an error if the file already exists.</div>
+
+<div style="text-align: left">&nbsp;&nbsp;&nbsp;Setting the flag parameter to <strong>WX</strong>, </div>
+
 ```js
 import { appendFile } from 'fs';
 
@@ -535,3 +537,299 @@ The requirements when we're going to need when we build our index file.
 - We want to iterate over our list of files and create an export statement that exports a function with the same name as the file.
 - We want to write to that file.
 - We want to close the file.
+
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Watching files</strong></font>
+
+&nbsp;&nbsp;&nbsp;I have now got a script that can output all of my hard work on reading files to a single index.js file, and as great as that is, what happens if I find a typo in one of my read files?
+Or what if I add a new file to that folder? is there some way to have my index file auto-update?
+
+&nbsp;&nbsp;&nbsp;To make my create.index file truly versatil, it would be great to let that script run and detect changes to the directory and files underneath that directory.
+
+&nbsp;&nbsp;&nbsp;Node's fs module provides this exact functionality.
+
+- The first parameter that the function takes is the path that is to be watched. This path can be either a single file or a directory. In this case I specified the entire read directory.
+- The second parameter is an <strong>event listener</strong>. Technically this is not a callback, instead it's a listener or handler. It's called every time the watch event fires. One of the main differences is that there is no error parameter.
+    This listener can take two parameters; the first one is the <strong>event type</strong>, which would be either a change or rename and the second one is the <strong>filename </strong>that was changed or renamed. We don't have to worry about the event type in this case.
+
+```js
+import { watch } from 'fs';
+
+watch('./read', () => {})
+```
+
+
+```js
+import { closeSync, openSync, readdirSync, watch, writeSync } from 'fs';
+import camelCase from'camelcase';
+
+watch("./read", () => {
+  const indexFd = openSync("./index.js", "w");
+
+  const files = readdirSync("./read");
+
+  files.map(f => {
+    const name = f.replace("js", "");
+    console.log(`Adding a file: ${f}`);
+
+    writeSync(
+      indexFd,
+      `module.exports.${camelCase(name)} = require('./read/${name}').read;\n`
+    );
+  });
+
+  closeSync(indexFd);
+});
+```
+
+&nbsp;&nbsp;&nbsp;When I run the file and modify any of the files I'll see the list of files scroll by on the screen and the index has been updated.
+
+&nbsp;&nbsp;&nbsp;Similary if I rename one of the files, the process will run again and it updates the index.js with the name of the file.
+
+<font size="5">&nbsp;<strong> Reading and Writing Streams</strong></font>
+
+Reading small files does not have much of an impact on system resources. What happens if we need to read in a considerably larger file?.
+
+To find out how large files perform, there's an open source tool named flog, which creates random log files.
+
+Node tries to read in a much larger file and asign it to a string, and in doing so it exceeded the max characters a string can have.
+
+```js
+Error with file: Error: cannot create a string longer than 0x3fffffe7 characters
+```
+
+When we call readFile() it's opening the file and loading all of its contents, and in our case we're assigning that to a variable. This means the entire contents of my file is being placed in memory before being accessible to my code. This is relatively quick but it does eat up a lot of system resources. That's why we need streams.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Reading Data from Stream</strong></font>
+
+&nbsp;&nbsp;&nbsp;Handling a stream is similar to reading a file, but there's at least one noticeable difference. With streams you don't read the stream with a function, instead you create a stream and receive data via an event.
+
+```js
+import { createReadStream } from 'fs';
+
+const stream = createReadStream('./data/app.log');
+
+stream.on('data', data => console.log(data));
+
+```
+
+console output:
+```js
+<Buffer 32 32 37 2e 38 35 2e 32 36 2e 32 31 35 20 2d 20 2d 20 5b 32 31 2f 30 39 2f 32 30 31 39 3a 31 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 4f 53 ... 65486 more bytes>
+<Buffer 22 48 45 41 44 20 2f 76 65 72 74 69 63 61 6c 22 20 35 30 32 20 31 34 30 32 31 0a 37 37 2e 39 38 2e 31 39 32 2e 33 32 20 2d 20 73 6b 69 6c 65 73 33 30 ... 29504 more bytes>
+```
+&nbsp;&nbsp;&nbsp;There are two lines displayed on the console, two separate buffers. The first one shows a buffer and states that there's an additional 65486 bytes left. The second buffer is similar, but it only has an additional 29504 bytes.
+
+&nbsp;&nbsp;&nbsp;Both buffers display 50 bytes on the screen. With the first buffer, if I add those 50 bytes to 65486, see that the first buffer has 65536 bytes, or 64KB. This happens because the default size for a stream is 64KB. So what we're seeing on the screen is that our data event was actually called twice.
+
+- Called #1: 64KB. The first time it had 64KB of data.
+- Called #2: 29KB. It had the remainder of 29KB, because the file I'm loading is less than 128KB.
+
+&nbsp;&nbsp;&nbsp;If our file had been, say, 129KB, the second buffer would have also been 64KB, the second buffer would have also been 64KB, and the last buffer would have only been 1KB.
+
+&nbsp;&nbsp;&nbsp;We have the ability to change the 64KB default with a second object parameter in the createReadStream() function. We tell it the number of bytes to take at one time. This is called the <strong>highWaterMark</strong>. It's the maximum number of bytes that the stream will read at one point.
+
+```js
+import { createReadStream } from 'fs';
+
+const stream = createReadStream('./data/app.log', { highWaterMark: 9550 });
+
+stream.on('data', data => console.log(data));
+
+```
+
+&nbsp;&nbsp;&nbsp;This time I'll see 10 buffers displayed on my console.
+```js
+<Buffer 32 32 37 2e 38 35 2e 32 36 2e 32 31 35 20 2d 20 2d 20 5b 32 31 2f 30 39 2f 32 30 31 39 3a 31 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 4f 53 ... 9500 more bytes>
+<Buffer 2d 20 77 69 7a 61 37 34 38 34 20 5b 32 31 2f 30 39 2f 32 30 31 39 3a 31 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 41 54 43 48 20 2f 70 72 6f ... 9500 more bytes>
+<Buffer 65 64 6e 65 72 34 38 35 38 20 5b 32 31 2f 30 39 2f 32 30 31 39 3a 31 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 48 45 41 44 20 2f 65 78 70 65 64 ... 9500 more bytes>
+<Buffer 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 4f 53 54 20 2f 63 6f 6e 76 65 72 67 65 6e 63 65 2f 65 66 66 69 63 69 65 6e 74 2f 6d 65 74 68 6f 64 6f ... 9500 more bytes>
+<Buffer 6e 67 2f 61 72 63 68 69 74 65 63 74 2f 69 6e 66 6f 6d 65 64 69 61 72 69 65 73 22 20 34 30 30 20 31 35 33 36 38 0a 32 32 2e 37 32 2e 32 32 37 2e 31 32 ... 9500 more bytes>
+<Buffer 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 55 54 20 2f 76 69 73 75 61 6c 69 7a 65 22 20 32 30 33 20 36 36 35 39 0a 35 38 2e 31 34 39 2e 31 35 ... 9500 more bytes>
+<Buffer 2d 30 35 30 30 5d 20 22 50 4f 53 54 20 2f 6d 61 67 6e 65 74 69 63 2f 73 79 73 74 65 6d 73 2f 65 78 70 65 72 69 65 6e 63 65 73 22 20 35 30 31 20 32 38 ... 9500 more bytes>
+<Buffer 32 31 20 2d 30 35 30 30 5d 20 22 50 41 54 43 48 20 2f 65 76 6f 6c 76 65 2f 73 74 72 61 74 65 67 69 7a 65 2f 77 65 62 2d 65 6e 61 62 6c 65 64 22 20 35 ... 9500 more bytes>
+<Buffer 30 39 2f 32 30 31 39 3a 31 30 3a 30 37 3a 32 31 20 2d 30 35 30 30 5d 20 22 50 4f 53 54 20 2f 72 65 69 6e 74 65 72 6d 65 64 69 61 74 65 2f 62 72 69 63 ... 9500 more bytes>
+<Buffer 30 5d 20 22 50 55 54 20 2f 32 34 2f 37 22 20 32 30 34 20 32 33 35 33 35 0a 32 34 37 2e 31 32 34 2e 31 33 36 2e 32 33 31 20 2d 20 2d 20 5b 32 31 2f 30 ... 9090 more bytes>
+```
+
+&nbsp;&nbsp;&nbsp;To see the content of our stream we use the <strong>encoding</strong> option
+
+```js
+import { createReadStream } from 'fs';
+
+const stream = createReadStream('./data/app.log', { 
+    highWaterMark: 9550,
+    encoding: 'utf8' });
+
+stream.on('data', data => console.log(data));
+
+```
+This time I can see the text of the file.
+```js
+.
+.
+.
+249.134.114.45 - schamberger2582 [21/09/2019:10:07:21 -0500] "POST /niches/engineer/best-of-breed/architectures" 416 20715
+96.130.94.188 - - [21/09/2019:10:07:21 -0500] "POST /deliver/scale/mesh" 304 26679
+122.248.119.131 - hilpert6706 [21/09/2019:10:07:21 -0500] "POST /synergies/architect/benchmark/benchmark" 400 4673
+163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /dot-com" 405 21512163.3.217.18 - - [21/09/2019:10:07:21 -0500] "GET /write-file-test" 405 21512
+```
+
+&nbsp;&nbsp;&nbsp;Sometimes we need the stream to pause for a bit so that we can deal with the data that we're receiving.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Pausing a Stream</strong></font>
+
+&nbsp;&nbsp;&nbsp;Sometimes the stream can move faster than my code can handle.
+&nbsp;&nbsp;&nbsp;To  manage the data in those situations.
+
+&nbsp;&nbsp;&nbsp;The first thing we wanna do is tell the stream to temporarily stop sending data. We do by adding a line before the console.log() statement. We want to make sure that while we're processing this event we're not receiving an additional event, so calling pause first solves this for that.
+
+```js
+import { createReadStream } from 'fs';
+
+const stream = createReadStream('./data/app.log', {
+    highWaterMark: 9550,
+    encoding: 'utf8'
+});
+
+stream.on('data', data => {
+    stream.pause();
+    console.log(data)
+});
+
+```
+
+&nbsp;&nbsp;&nbsp;Pausing the data isn't enough, because that will only allow you to access the data up to the point that I pause.
+
+&nbsp;&nbsp;&nbsp;There is also a resume function.
+
+&nbsp;&nbsp;&nbsp;This code will run every two seconds and resume the stream.
+
+```js
+import { createReadStream } from 'fs';
+
+const stream = createReadStream('./data/app.log', {
+    highWaterMark: 9550,
+    encoding: 'utf8'
+});
+
+stream.on('data', data => {
+    stream.pause();
+    console.log(data);
+
+    setTimeOut
+});
+
+```
+
+&nbsp;&nbsp;&nbsp;We can see the first block of 9550 bytes coming across. Then after two seconds we can see the next block of code. If I let this run for about 20 seconds, I'll eventually see the entire file again.
+
+&nbsp;&nbsp;&nbsp;Part of the power of strams if that I can have input or readStreams, as well as output or writeStreams. This allows me the ability to bring in data from one method, process that data and send it out somewhere else.
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Writing to a Stream</strong></font>
+
+Sometimes we want to be able to stream data out, for example to save it as a file.
+
+```js
+import { createReadStream, createWriteStream } from 'fs';
+
+const stream = createReadStream('./data/app.log', {
+    highWaterMark: 95,
+    encoding: 'utf8'
+});
+```
+
+By changing the highWaterMark from 9550 to just 95 allows us to simulate a longer running stream just for demostration purposes.
+
+
+As it runs I'll start to see the numbers printed out to my console every second and if I open up the data ouput.log file, I can see some familiar log entries.
+
+The createWriteStream function also takes some optional parameters. 
+- Flags
+- Encoding
+
+Other than that, there isn't actually a lot to writing out to a stream, or at least there's less to configure than when reading from a stream.
+
+Internally, console.log calls a stream to print data to the console. See that the process.stdout uses the familiar write function to send the data. That's because process.stdout is a stream.
+
+```js
+console.log = function (d) {
+    process.stdout.write(d + '\n')
+}
+```
+
+<strong> What happens when my output stream is slower than my input stream?</strong>
+
+<font size="4">&nbsp;&nbsp;&nbsp;<strong>- Handling Mistmatched Streams</strong></font> 
+
+&nbsp;&nbsp;&nbsp;<strong>The last example showed how to take data from one stream and send it to another stream. It was reading in from one file and writing out to another. Sometimes that action can cause problems.
+
+&nbsp;&nbsp;&nbsp;<strong>As long as the output stream could handle the data that the input stream is providing, everything is good. Data comes in, is manipulated or processed, and sent out without a serious burden on the system resources. Even if the output stream is faster than the input stream, there's stil no problems. In that case the output stream is idle waiting on the next chunk of data from the input stream.
+
+&nbsp;&nbsp;&nbsp;<strong>Unfortunately, that doesn't always happen. For example, writing a file is slower operation than reading a file, so it's possible that the output stream would start to build up a backlog of data that it needs to write out, adn the bigger the difference between the input and the processing output, the bigger that backlog is going to be. This problem is called <strong>back pressure.</strong>
+
+<font size="3"><strong>Back pressure: </strong></font> A backup of data, caused by streams being unable to process data before the next batch arrvies.
+
+If this isn't handle correctly, a memory issue can occur as the project's memory footprint grows bigger and bigger.
+
+with the following code the counter will go to around 20000, and then an exception is thrown.
+
+```js
+import { createReadStream, createWriteStream, writeData } from 'fs';
+
+/**
+ * it load the 64KB in each chunk
+ */
+const stream = createReadStream('./data/stream.log', {
+    encoding: "utf8"
+});
+
+const writer = createWriteStream("./data/output.log");
+
+let iteration = 0;
+/**
+ * The data on event is not pausing the stream.
+ * It is reading as fast as it possibly can.
+ */
+stream.on('data', data => {
+
+    writeData(data); 
+    setTimeout(() => {
+        stream.resume();
+    }, 1000)
+});
+
+const writeData = data => {
+    /**
+     * Most of the time We don't want to set a timeout in our code
+     * This is only to simulate a write stream that is much slower than the read stream.
+     */
+    setTimeout(() => {
+        writer.write(data);
+    }, 6000)
+}
+```
+
+&nbsp;&nbsp;&nbsp;<strong>An exception is thrown. That's because it's loaded to 1.8GB of data from the file. while it's loaded in the data there hasn't been any data written out.
+```js
+FATAL ERROR: CALL_AND_ENTRY_LAST Allocation failed - Javascript heap out of memory
+```
+
+&nbsp;&nbsp;&nbsp;<strong>Node has a function to help with that.
+
+```js
+import { createReadStream, createWriteStream } from 'fs';
+
+/**
+ * it load the 64KB in each chunk
+ */
+const stream = createReadStream('./data/stream.log', {
+    encoding: "utf8"
+});
+
+const writer = createWriteStream("./data/output.log");
+
+stream.pipe(writer);
+```
+
+&nbsp;&nbsp;&nbsp;<strong>We don't have anything output to the console, but the snippet runs quickly and returns to the shell. It was able to copy that nearly 2GB file without loading it all into a memory, and without running into a memory exception.

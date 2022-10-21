@@ -1,9 +1,8 @@
-const { closeSync, openSync, readdirSync, watch, writeSync } = require('fs');
+import { closeSync, openSync, readdirSync, watch, writeSync } from 'fs';
 // {camelCase} = require('camelcase');
-const camelCase = import('camelCase');
+import camelCase from 'camelcase';
 
 watch("./read", () => {
-  console.log(camelCase);
   /**
    * if we don't specify the 'w' parameter, the file will be opened
    * in a read mode and will throw an exception when we try to write it.
